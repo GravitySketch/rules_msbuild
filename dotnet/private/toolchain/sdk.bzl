@@ -2,6 +2,7 @@ load("@bazel_tools//tools/build_defs/repo:utils.bzl", "update_attrs")
 load("//dotnet/private:platforms.bzl", "generate_toolchain_names")
 load("//dotnet/private/msbuild:nuget.bzl", "NUGET_BUILD_CONFIG", "prepare_nuget_config")
 load("//dotnet/private/toolchain:common.bzl", "default_tfm", "detect_host_platform")
+load("//dotnet/private/toolchain:sdk_urls.bzl", "CORE_SDK_REPOSITORIES")
 load("//deps:public_nuget.bzl", "PACKAGES")
 
 SDK_NAME = "dotnet_sdk"
@@ -10,10 +11,9 @@ _download_sdk_attrs = {
     "version": attr.string(),
     "nuget_repo": attr.string(mandatory = True),
     "shas": attr.string_dict(),
-    "installer_shas": attr.string_dict(),
 }
 
-def msbuild_register_toolchains(version = None, shas = {}, installer_shas = {}, nuget_repo = "nuget"):
+def msbuild_register_toolchains(version = None, shas = {}, nuget_repo = "nuget"):
     if not version:
         fail('msbuild_register_toolchains: version must be a string like "3.1.100" or "host"')
 
@@ -27,7 +27,6 @@ def msbuild_register_toolchains(version = None, shas = {}, installer_shas = {}, 
             name = SDK_NAME,
             version = version,
             shas = shas,
-            installer_shas = installer_shas,
             nuget_repo = nuget_repo,
         )
     _register_toolchains(SDK_NAME)
@@ -78,53 +77,27 @@ def _try_execute(ctx, args):
         fail("error {} executing `{}`: {}".format(res.return_code, " ".join(args), res.stderr))
     return res.stdout
 
-def _dotnet_download_sdk_impl(ctx):
+def get_platform_details(ctx):
     version = ctx.attr.version
     os, arch = detect_host_platform(ctx)
-
     platform = os + "_" + arch
+
+    return version, os, arch, platform
+
+def _dotnet_download_sdk_impl(ctx):
+    version, os, arch, platform = get_platform_details(ctx)
+
     shas = getattr(ctx.attr, "shas", {})
     sdk_sha = ""
     if platform in shas:
         sdk_sha = shas[platform]
 
-    installer_shas = getattr(ctx.attr, "installer_shas", {})
-    install_script = None
-    script_url = None
-    args = None
-    installer_sha = ""
-    if platform in installer_shas:
-        installer_sha = installer_shas[platform]
-    if os == "windows":
-        script_url = "https://dot.net/v1/dotnet-install.ps1"
-        install_script = ctx.path("dotnet-install.ps1")
-        args = ["powershell", "-NoProfile", str(install_script)]
-    else:
-        script_url = "https://dot.net/v1/dotnet-install.sh"
-        install_script = ctx.path("dotnet_install.sh")
-        args = [str(install_script)]
-
-    ctx.download(
-        url = script_url,
-        output = install_script,
-        sha256 = installer_sha,
-        executable = True,
-    )
-
-    # bash supports the same as the powershell script, so we can use the same set of args
-    args.extend(["-DryRun", "-NoPath", "-Version", version])
-
-    res = ctx.execute(args)
-
-    url = None
-    for line in res.stdout.split("\n"):
-        if "rimary" in line and ("url" in line or "URL" in line) and "-dev-" not in line:
-            url = line.rsplit(" ", 1)[1]
-            break
-
-    if url == None:
-        fail("failed to parse Primary url from:\nstdout:{}\nstderr:{}".format(res.stdout, res.stderr))
-
+    if ctx.attr.version not in CORE_SDK_REPOSITORIES:
+        fail("no cached sdk repository for unknown .net core version '{}', expected one of {}".format(ctx.attr.version, [v for v, _ in CORE_SDK_REPOSITORIES.items()]))
+    sdk_versions = CORE_SDK_REPOSITORIES[ctx.attr.version]
+    if platform not in sdk_versions:
+        fail("no cached sdk repository for unknown platform '{}', expected one of {}".format(platform, [p for p, _ in sdk_versions.items()]))
+    url, sdk_sha = sdk_versions[platform]
     ctx.report_progress("Downloading Dotnet Sdk from {}".format(url))
 
     res = ctx.download_and_extract(url, sha256 = sdk_sha)
@@ -133,7 +106,7 @@ def _dotnet_download_sdk_impl(ctx):
     if sdk_sha == "":
         shas = getattr(ctx.attr, "shas", {})
         orig = dict(shas.items())
-        orig[platform] = res.sha256
+        orig[platform] = sdk_sha
         attr_udpates["shas"] = orig
 
     _sdk_build_file(ctx, ctx.attr.version)
