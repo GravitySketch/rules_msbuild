@@ -220,8 +220,7 @@ CORE_SDK_REPOSITORIES = {
         # https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/sdk-6.0.100-macos-arm64-binaries
         "darwin_arm64": (
             "https://download.visualstudio.microsoft.com/download/pr/7f1e67c2-11a4-416b-8421-786e47b82fdf/af56581d96e15ed911cf3a172f3c8802/dotnet-sdk-6.0.100-osx-arm64.tar.gz",
-            # FIXME(chris)
-            "3333375322680f5ab31998a9412af0a2a66b73c2cf5a5d8007221a96fbcf2e8d",
+            "140afd65da6bb4655f2b6ea92797bccaaacb24c5db6e26b2ccf3ea41ec71ce56",
         ),
         # https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/sdk-6.0.100-macos-x64-binaries
         "darwin_amd64": (
