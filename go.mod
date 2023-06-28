@@ -9,5 +9,5 @@ require (
 	github.com/bmatcuk/doublestar v1.2.2
 	github.com/stretchr/testify v1.7.0
 	github.com/termie/go-shutil v0.0.0-20140729215957-bcacb06fecae
-	golang.org/x/sys v0.0.0-20210415045647-66c3f260301c
+	golang.org/x/sys v0.1.0
 )
